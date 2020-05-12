@@ -2291,3 +2291,66 @@ function shuffle (arr) {
   return arr
 }
 ```
+
+## 14 算法设计与技巧
+常见思想：
+* 分而治之
+* 动态规划
+* 贪心算法
+* 回溯算法
+
+### 14.1 分而治之
+分而治之是将大问题分解问小问题进行解决的思想，如归并排序、快速排序、桶排序等。
+步骤：
+1. 分解为小问题
+2. 解决小问题
+3. 组合这些小问题
+
+#### 14.1.1 二分搜索分而治之版
+```
+function binarySearch (arr, value, isSort = false, compareFn = defaultCompare) {
+  isSort && (arr = quickSort(arr))
+  return binarySearchRecursive(arr, value, 0, arr.length - 1, compareFn)
+}
+function binarySearchRecursive (arr, value, leftIndex, rightIndex, compareFn) {
+  if (leftIndex > rightIndex) return DOES_NOT_EXIST
+  const middleIndex = Math.floor((leftIndex + rightIndex) / 2)
+  const element = arr[middleIndex]
+  if (compareFn(element, value) === Compare.LESS_THEN) {
+    return binarySearchRecursive(arr, value, middleIndex + 1, rightIndex, compareFn)
+  } else if (compareFn(element, value) === Compare.BIGGER_THEN) {
+    return binarySearchRecursive(arr, value, leftIndex, middleIndex - 1, compareFn)
+  } else {
+    return middleIndex
+  }
+}
+```
+
+#### 14.1.2 内插搜索分而治之版
+```
+function interpolationSearch (arr, value, isSort = false, compareFn = defaultCompare) {
+  isSort && (arr = quickSort(arr))
+  return interpolationSearchRecursive(arr, value, 0, arr.length - 1, compareFn)
+}
+function interpolationSearchRecursive(arr, value, leftIndex, rightIndex, compareFn) {
+  if (leftIndex > rightIndex || value < arr[leftIndex] || value > arr[rightIndex]) return DOES_NOT_EXIST
+  const delta = (value - arr[leftIndex]) / (arr[rightIndex] - arr[leftIndex])
+  const position = leftIndex + Math.floor((arr[rightIndex] - arr[leftIndex]) * delta)
+  const element = arr[position]
+  if (compareFn(element, value) === Compare.LESS_THEN) {
+    return interpolationSearchRecursive(arr, value, position + 1, rightIndex, compareFn)
+  } else if (compareFn(element, value) === Compare.BIGGER_THEN) {
+    return interpolationSearchRecursive(arr, value, leftIndex, position - 1, compareFn)
+  } else {
+    return position
+  }
+}
+```
+
+### 14.2 动态规划
+动态规划也是将复杂问题拆成多个简单的问题，解决简单问题进而解决复杂问题的思想，与分而治之不同的是，动态规划是拆分成多个相互依赖的小问题，分而治之是拆分成多个互相独立的问题。
+
+步骤：
+1. 定义子问题
+2. 实现反复执行来解决问题的部分（即递归解决小问题）
+3. 识别并求解出基线条件

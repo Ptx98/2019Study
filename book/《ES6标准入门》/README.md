@@ -6,15 +6,15 @@
 
 1. 取消变量声明提前（同时导致出现暂时性死区）
 2. 不允许重复声明
-3. 增加了块级作用域，任何大括号都可以形成块级作用域（解决闭包问题）
+3. 增加了块级作用域，任何大括号都可以形成块级作用域
 4. let&const 定义的全局变量不作为 window 的变量
+5. typeof 判断未定义变量时，返回 undefined，ES5 会报错（typeof 不再百分百安全）
 
 ### 注意事项
 
 1. 应该避免在块级作用域内声明函数
 2. const 定义的对象属性值依然可以改变，但地址不能改变。const 实际上保证的是变量指向的内存地址不变
-3. typeof 判断未定义变量时，返回 undefined，ES5 会报错（typeof 不再百分百安全）
-4. ES5 规定函数只能在全局作用域或函数作用域中声明，不能在块级作用域声明。ES6 规定函数可以在块级作用域中声明，且只能在块级作用域中引用。但浏览器对该规定实现不一，应尽量避免在块级作用域中声明函数。（可以写成函数表达式来代替）
+3. ES5 规定函数只能在全局作用域或函数作用域中声明，不能在块级作用域声明。ES6 规定函数可以在块级作用域中声明，且只能在块级作用域中引用。但浏览器对该规定实现不一，应尽量避免在块级作用域中声明函数。（可以写成函数表达式来代替）
 
 ### 暂时性死区
 
@@ -30,14 +30,19 @@ bar()
 垫片库 global-this 可以在所有环境下拿到 globalThis(顶层对象)
 ```
 // 垫片库源码
+// 这是一种性能优化方式，通过一个立即执行函数包裹，将需要使用的全局对象传入，可以加快查找速度。
 (function (Object) {
+  // 判断全局是否存在gloalThis，不存在则创建
   typeof globalThis !== 'object' && (
+    // 非严格模式下this指向window，严格模式下或模块中this指向undefined
     this ?
+      // 非严格模式下直接将全局对象挂载到globalThis中
       get() :
-      (Object.defineProperty(Object.prototype, '_T_', {
-        configurable: true,
-        get: get
-      }), _T_)
+      // 严格模式下，括号中的语句使用，隔开，从左到右依次执行，先设置
+        (Object.defineProperty(Object.prototype, '_T_', {
+          configurable: true,
+          get: get
+        }), _T_)
   );
   function get() {
     this.globalThis = this;
@@ -174,7 +179,7 @@ js 中的字符串可以识别普通字符串表达式，转义字符串表达�
 
 es6 之前只能解析\u0000-\uFFFF 的字符，超出部分必须使用双字节表示。可以看出来四位的 unicode 码只能表示 16^4(65536)种字符。ES6 使用'\u{1F680}'来解析任意位数的 unicode 编码。
 
-### 特点
+### 扩展项
 
 1. ES6 之前要求 unicode 字符必须是 4 位数的，ES6 引入\u{}写法后可以是任意位数
 2. for...in 不能正确识别 ES6 写法的 unicode 字符串，需要使用 for...of
@@ -374,14 +379,6 @@ String.raw = function (strings, ...values) {
 ### 4.12 str.trimEnd()
 
 清空字符串结尾空格，同 str.trimRight()
-
-### 4.13 str.matchAll()
-
-返回一个正则表达式在当前字符串的所有匹配
-
-```
-
-```
 
 ## 5 正则的扩展
 
@@ -964,7 +961,7 @@ function foo() {}
 foo.name // "foo"
 ```
 
-匿名函数 ES5 中 name 发回空字符串，ES6 返回变量名
+匿名函数 ES5 中 name 返回空字符串，ES6 返回变量名
 
 ```
 var f = function () {};
@@ -1235,7 +1232,7 @@ const arr = [
 #### 8.1.1 扩展运算符的用途
 
 ```
-// 复制数组
+// 复制数组 这个是浅拷贝
 const arr1 = [1,2,3]
 const [...arr2] = arr1
 const arr3 = [...arr1]
@@ -1458,7 +1455,7 @@ const obj = {
 #### 9.4.1 可枚举性
 
 对象的每个属性都有一个描述对象（Descriptor），用来控制该属性的行为。Object.getOwnPropertyDescriptor 方法可以获取该属性的描述对象。
-
+// 设置属性的描述对象 Object.definedProperty()
 ```
 let obj = { foo: 123 };
 Object.getOwnPropertyDescriptor(obj, 'foo')
@@ -2076,12 +2073,12 @@ const arr = [1, 2, 3]
 const handle = {
   get (target, propKey, receive) {
     const index = Number.parseInt(propKey)
-    if (index < 0 && target.length + index) {
+    if (index < 0 && (target.length + index) > 0) {
       propKey = (target.length + index).toString()
-    } else if (index < 0){
+    } else if (target.length + index < 0){
       return undefined
     }
-    Reflect.get(target, propKey, receive)
+    return Reflect.get(target, propKey, receive)
   }
 }
 ```
@@ -2099,8 +2096,9 @@ const handle = {
     if (propKey.startsWith('_')) {
       throw new Error(`Invalid attempt to set private "${propKey}" property`)
     }
-    target[propKey] = value
-    return true
+    // target[propKey] = value
+    // return true
+    return Reflect.set(target, propKey, value, receive)
   }
 }
 const proxy = new Proxy({_a: 1}, handle)
@@ -2216,7 +2214,7 @@ const handler = {
 // 可用于阻止删除内部变量
 ```
 
-#### 13.4.7 defineProperty(target, key, description) 拦截object.definedProperty()
+#### 13.4.7 defineProperty(target, key, description) 拦截Object.definedProperty()
 ```
 var handler = {
   defineProperty (target, key, descriptor) {
@@ -2226,6 +2224,13 @@ var handler = {
 var target = {};
 var proxy = new Proxy(target, handler);
 proxy.foo = 'bar' // 不会生效
+
+// 默认
+const handle = {
+  definedProperty (target, key, description) {
+    return Object.definedProperty(target, key, description)
+  }
+}
 ```
 
 #### 13.4.8 getOwnPropertyDescriptor(target, key) 返回一个属性描述对象或者undefined 拦截Object.getOwnPropertyDescriptor()
@@ -2264,6 +2269,13 @@ var p = new Proxy({}, {
   }
 });
 Object.getPrototypeOf(p) === proto // true
+
+// 默认
+const handle = {
+  getPrototypeOf (target) {
+    return Object.getPrototypeOf(target)
+  }
+}
 ```
 
 #### 13.4.10 isExtensible(target) 拦截Object.isExtensible操作，只能返回布尔值
@@ -2280,7 +2292,7 @@ Object.isExtensible(p)
 // true
 ```
 
-#### 13.4.11 ownKeys(target) 拦截对象自身属性的读取操作,如:
+#### 13.4.11 ownKeys(target) 拦截对象自身属性的循环读取操作,如:
 * `Object.getOwnPropertyNames()`
 * `Object.getOwnPropertySymbols()`
 * `Object.keys()`
@@ -2315,6 +2327,13 @@ var target = function () {}
 var proxy = new Proxy(target, handler)
 Object.setPrototypeOf(proxy, proto)
 // Error: Changing the prototype is forbidden
+
+// 默认
+const handle = {
+  setPrototypeOf (target, newPrototype) {
+    return Object.setPrototypeOf(target, newPrototype)
+  }
+}
 ```
 
 ### 13.5 Proxy的静态方法 Proxy.revocable
@@ -2549,9 +2568,6 @@ promise
 
 ### 15.1.4
 ```
-new Promise(resolve => {
-  resolve(value)
-})
 Promise.resolve(1)
   .then((res) => {
     console.log(res)
@@ -2753,6 +2769,34 @@ throw方法主要是配合 Generator 函数使用，一般的遍历器对象用�
 1. forEach,map等方法遍历的缺点是不能使用return，break语句来结束循环
 2. for...in 缺点：会遍历原型链上的属性，遍历对象时，顺序不是添加顺序
 
+### 16.8 使用iterator实现遍历对象的接口
+```
+function iterator () {
+  const entries = Object.entries(this)
+  let index = 0
+  return {
+    next () {
+      return index < entries.length ? {
+        value: entries[index++],
+        done: true
+      } : {
+        value: undefined,
+        done: false
+      }
+    }
+  }
+}
+
+// 使用
+const obj = {
+  a: 1,
+  b: 2
+}
+obj[Symbol.iterator] = iterator
+// 展开对象
+[...obj]
+```
+
 ## 17 Generator函数的语法
 Generator函数是ES6提出的一种异步编程解决方案。可以将Generator理解为一个状态机，内部封装了多个状态。
 
@@ -2797,6 +2841,25 @@ const obj = {
 }
 [...obj] // 1 2 3
 ```
+
+```
+// 通过generator实现对象遍历器接口(比直接实现更简单，直观)
+function * objIterator () {
+  for (let [key, value] of Object.entries(this)) {
+    yield [key, value]
+  }
+}
+
+// 使用
+const obj = {
+  a: 1,
+  b: 2
+}
+obj[Symbol.iterator] = objIterator
+// 展开对象
+[...obj]
+```
+
 ### 17.5 next方法的参数
 next方法可以接收参数传递给Generator函数(状态机外部改变状态机内部)。yield表达式本身返回值为undefined,next方法接收到的参数会作为yield表达式的返回值。
 ```
